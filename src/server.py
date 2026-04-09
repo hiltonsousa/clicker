@@ -14,8 +14,8 @@ SERVER_PORT = 5007
 
 MOUSE_SPEED = 0.01
 
-SKIP_X = 1591
-SKIP_Y = 1130
+SKIP_X = 1062
+SKIP_Y = 877
 
 def log(s):
     print(f"{datetime.now()}: {s}")
@@ -121,7 +121,6 @@ class Listener(BaseHTTPRequestHandler):
                 time.sleep(10)  
                 close_tab()  # close the new tab opened by the CTA button
 
-            time.sleep(3)  # wait for the ad to load
             click_point(SKIP_X, SKIP_Y)
             self.skips += 1
 
@@ -134,8 +133,6 @@ class Listener(BaseHTTPRequestHandler):
             log(f"Payloads received: {self.payloads}")
             log(f"Clicks performed: {total_clicks}")
             log(f"Skips performed: {self.skips - total_clicks}")
-            # log(f"CTA Texts: {self.cta_texts}")
-            # log(f"Advertisers: {self.advertisers}")
             log("-"*40)
     
     def do_POST(self):

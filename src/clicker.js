@@ -28,12 +28,21 @@
         "https://www.youtube.com/watch?list=OLAK5uy_mIJiKQScQ5-9mGg3z4HVmm_eXCILxywfU&v=vX_xeW1kbwU",
         "https://www.youtube.com/watch?list=OLAK5uy_midodhMrR-5Bh6CJDch-u3S8CFwcfLYvY&v=wCyffEmWll8",
         "https://www.youtube.com/watch?list=OLAK5uy_kD6s5v3EDtqep-DRaNL7MEf_byEPiRZR8&v=5HlhpOwzY_0",
+        "https://www.youtube.com/watch?list=OLAK5uy_kj6WZIdyX7bedh1QtBYL1-Wmn-lYS6fgc&v=HeJ5rU5Hx78",
+        "https://www.youtube.com/watch?list=OLAK5uy_moLW8gaBkxRTXOANGYsuTCEeWT8dOYIwc&v=bniPraR3K9U",
+        "https://www.youtube.com/watch?list=OLAK5uy_l6TyVwIMC0fUtea9FU3JMmVzCBxR21h9g&v=mKbkYy-kqrw",
+        "https://www.youtube.com/watch?list=OLAK5uy_lwyeCJz28qz9_bSqYYkkcqsuhn_ECJ9s8&v=XABikyMMUxs",
+        "https://www.youtube.com/watch?list=OLAK5uy_nV29-NthNjoy3cRWRsT6O9H8gWEKUZF4s&v=YKPR95SpkcY",
+        "https://www.youtube.com/watch?list=OLAK5uy_n5VzCA_71XuI3zb6gZwkXXvDPGuyNEfg0&v=5TB-Uyp2JjY"
     ];
 
     const PLAY_DURATION = 28 * 60 * 1000;
     const SKIP_THRESHOLD = 0.6;
+    const ENABLED = true;
 
     const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+    let lastAdvertiser = "";
 
     function mylog(...args) {
         console.log("YTC: ", ...args);
@@ -41,13 +50,24 @@
 
     async function notifyServer(jsonData) {
         mylog("Notifying server");
-        GM_xmlhttpRequest({
-            method: "POST",
-            url: "http://0.0.0.0:5007",
-            data: JSON.stringify(jsonData),
-            headers: {
-                "Content-Type": "application/json"
-            }
+
+        return new Promise((resolve, reject) => {
+            GM_xmlhttpRequest({
+                method: "POST",
+                url: "http://0.0.0.0:5007",
+                data: JSON.stringify(jsonData),
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                onload: function (response) {
+                    mylog("Server responded:", response.responseText);
+                    resolve(response);
+                },
+                onerror: function (error) {
+                    console.error("Request failed:", error);
+                    reject(error);
+                }
+            });
         });
     }
 
@@ -72,11 +92,14 @@
             else {
                 mylog("CTA detected: ", btnText);
                 let advertiserName = advertiser ? advertiser.innerText.toLowerCase() : "Unknown"
+                if (lastAdvertiser == "") {
+                    lastAdvertiser = advertiserName;
+                }
                 let payload = {
                     "cta_text": btnText,
                     "advertiser": advertiserName
                 }
-                let skipClick = advertiserName.includes("google") || Math.random() > SKIP_THRESHOLD;
+                let skipClick = lastAdvertiser == advertiserName || advertiserName.includes("google") || Math.random() > SKIP_THRESHOLD;
                 mylog('Advertiser: ', advertiserName);
                 if (skipClick) {
                     mylog("Skipping click for CTA: ", btnText);
@@ -85,8 +108,12 @@
                     mylog("Clicking CTA: ", btnText);
                     ctaButton.click();
                 }
-                await notifyServer(payload);
-                await sleep(20000);
+                try {
+                    const response = await notifyServer(payload);
+                    mylog("Done");
+                } catch (err) {
+                    mylog("Error: ", err);
+                }
             }
         }
     }
@@ -104,7 +131,7 @@
         unsafeWindow.location.href = nextUrl;
     }
 
-    mainLoop();
+    if (ENABLED) mainLoop();
 
 
 })();
