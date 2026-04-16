@@ -20,6 +20,9 @@ SKIP_Y = 877
 def log(s):
     print(f"{datetime.now()}: {s}")
 
+def get_today_key():
+    return datetime.now().strftime("%Y-%m-%d")
+
 def close_tab():
     log("Closing tab")
     hotkey("command", key="w")
@@ -30,16 +33,13 @@ def click_point(x, y, wait_time=1):
     pyautogui.click()
 
 def hotkey(*modifiers, key, delay=0.05):
-    # press all modifiers
     for mod in modifiers:
         pyautogui.keyDown(mod)
         time.sleep(delay)
 
-    # press the main key
     pyautogui.press(key)
     time.sleep(delay)
 
-    # release modifiers in reverse order (important)
     for mod in reversed(modifiers):
         pyautogui.keyUp(mod)
         time.sleep(delay)
@@ -48,14 +48,10 @@ def hotkey(*modifiers, key, delay=0.05):
 class Listener(BaseHTTPRequestHandler):
 
     def __init__(self, request, client_address, server):
-        # Load existing stats from file
         self.load_stats()
-        
-        # Call the parent class __init__ with the required arguments
         super().__init__(request, client_address, server)
     
     def load_stats(self):
-        """Load statistics from JSON file"""
         try:
             if os.path.exists(STATS_FILE):
                 with open(STATS_FILE, 'r') as f:
@@ -64,42 +60,41 @@ class Listener(BaseHTTPRequestHandler):
                     self.skips = stats.get('skips', 0)
                     self.payloads = stats.get('payloads', 0)
                     self.cta_texts = stats.get('cta_texts', {})
+                    self.daily_stats = stats.get('daily_stats', {})
                     log(f"Loaded stats from {STATS_FILE}")
             else:
-                # Initialize with empty stats
                 self.advertisers = {}
                 self.skips = 0
                 self.payloads = 0
                 self.cta_texts = {}
-                log(f"No existing stats file found, starting fresh")
+                self.daily_stats = {}
+                log("No existing stats file found, starting fresh")
         except Exception as e:
             log(f"Error loading stats: {e}")
-            # Initialize with empty stats on error
             self.advertisers = {}
             self.skips = 0
             self.payloads = 0
             self.cta_texts = {}
+            self.daily_stats = {}
     
     def save_stats(self):
-        """Save current statistics to JSON file"""
         try:
             stats = {
                 'advertisers': self.advertisers,
                 'skips': self.skips,
                 'payloads': self.payloads,
                 'cta_texts': self.cta_texts,
+                'daily_stats': self.daily_stats,
                 'last_updated': time.time()
             }
-            
-            # Write to a temporary file first, then rename to avoid corruption
+
             temp_file = f"{STATS_FILE}.tmp"
             with open(temp_file, 'w') as f:
                 json.dump(stats, f, indent=2)
-            
-            # Rename temp file to actual file (atomic operation on most systems)
+
             os.replace(temp_file, STATS_FILE)
-            
             log(f"Stats saved to {STATS_FILE}")
+
         except Exception as e:
             log(f"Error saving stats: {e}")
     
@@ -109,6 +104,15 @@ class Listener(BaseHTTPRequestHandler):
             cta_text = payload.get('cta_text')
             advertiser = payload.get('advertiser')
 
+            today = get_today_key()
+
+            # Ensure today's structure exists
+            self.daily_stats.setdefault(today, {
+                'clicks': 0,
+                'skips': 0
+            })
+
+            # Track CTA texts
             self.cta_texts.setdefault(cta_text, 0)
             self.cta_texts[cta_text] += 1
 
@@ -118,11 +122,15 @@ class Listener(BaseHTTPRequestHandler):
                 self.advertisers.setdefault(advertiser, 0)
                 self.advertisers[advertiser] += 1
 
-                time.sleep(10)  
-                close_tab()  # close the new tab opened by the CTA button
+                self.daily_stats[today]['clicks'] += 1
+
+                time.sleep(10)
+                close_tab()
+            else:
+                self.skips += 1
+                self.daily_stats[today]['skips'] += 1
 
             click_point(SKIP_X, SKIP_Y)
-            self.skips += 1
 
             # Save stats after every update
             self.save_stats()
@@ -132,30 +140,24 @@ class Listener(BaseHTTPRequestHandler):
             log(f"Advertiser: {advertiser}, CTA: {cta_text}")
             log(f"Payloads received: {self.payloads}")
             log(f"Clicks performed: {total_clicks}")
-            log(f"Skips performed: {self.skips - total_clicks}")
+            log(f"Skips performed: {self.skips}")
+            log(f"Today's stats: {self.daily_stats[today]}")
             log("-"*40)
     
     def do_POST(self):
-        # Get the content length
         content_length = int(self.headers.get('Content-Length', 0))
-        
-        # Read the POST data
         post_data = self.rfile.read(content_length)
         
-        # Parse JSON payload
         payload = None
         try:
             if post_data:
                 payload = json.loads(post_data.decode('utf-8'))
-                # log(f"Received JSON payload: {json.dumps(payload, indent=2)}")
         except json.JSONDecodeError as e:
             log(f"Error decoding JSON: {e}")
             log(f"Raw data: {post_data}")
         
-        # Pass payload to handle_ad
         self.handle_ad(payload)
         
-        # Send response
         self.send_response(200)
         self.send_header('Content-Type', 'application/json')
         self.end_headers()

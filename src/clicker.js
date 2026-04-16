@@ -37,7 +37,7 @@
     ];
 
     const PLAY_DURATION = 28 * 60 * 1000;
-    const SKIP_THRESHOLD = 0.6;
+    const SKIP_THRESHOLD = 0.8;
     const ENABLED = true;
 
     const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -72,7 +72,6 @@
     }
 
     async function checkForVideoAd() {
-        //const adModule = document.querySelector('.video-ads.ytp-ad-module');
         const skipButton = document.querySelector('.ytp-skip-ad-button:not([style*="display: none"])')
         const ctaButton = document.querySelector('.ytp-ad-button-vm');
         const advertiser = document.querySelector('.ytp-visit-advertiser-link__text');
