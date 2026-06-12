@@ -12,10 +12,10 @@ STATS_FILE = "ad_stats.json"
 SERVER_ADDRESS = "0.0.0.0"
 SERVER_PORT = 5007
 
-MOUSE_SPEED = 0.01
+MOUSE_SPEED = 1
 
-SKIP_X = 1062
-SKIP_Y = 877
+SKIP_X = 2909
+SKIP_Y = 1417
 
 def log(s):
     print(f"{datetime.now()}: {s}")
@@ -124,25 +124,27 @@ class Listener(BaseHTTPRequestHandler):
 
                 self.daily_stats[today]['clicks'] += 1
 
-                time.sleep(10)
-                close_tab()
+                total_clicks = sum(self.advertisers.values())
+
+                log(f"Advertiser: {advertiser}, CTA: {cta_text}")
+                log(f"Payloads received: {self.payloads}")
+                log(f"Clicks performed: {total_clicks}")
+                log(f"Skips performed: {self.skips}")
+                log(f"Today's stats: {self.daily_stats[today]}")
             else:
+                log("New skip")
+                log(f"Advertiser: {advertiser}, CTA: {cta_text}")
                 self.skips += 1
                 self.daily_stats[today]['skips'] += 1
-
-            click_point(SKIP_X, SKIP_Y)
 
             # Save stats after every update
             self.save_stats()
 
-            total_clicks = sum(self.advertisers.values())
-
-            log(f"Advertiser: {advertiser}, CTA: {cta_text}")
-            log(f"Payloads received: {self.payloads}")
-            log(f"Clicks performed: {total_clicks}")
-            log(f"Skips performed: {self.skips}")
-            log(f"Today's stats: {self.daily_stats[today]}")
             log("-"*40)
+
+            
+
+
     
     def do_POST(self):
         content_length = int(self.headers.get('Content-Length', 0))
@@ -152,11 +154,14 @@ class Listener(BaseHTTPRequestHandler):
         try:
             if post_data:
                 payload = json.loads(post_data.decode('utf-8'))
+                self.handle_ad(payload)
         except json.JSONDecodeError as e:
             log(f"Error decoding JSON: {e}")
             log(f"Raw data: {post_data}")
         
-        self.handle_ad(payload)
+        time.sleep(20)
+        
+        click_point(SKIP_X, SKIP_Y)
         
         self.send_response(200)
         self.send_header('Content-Type', 'application/json')
